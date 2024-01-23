@@ -3,4 +3,5 @@
     <string name="title_home">Home</string>
     <string name="title_parts">配件箱</string>
     <string name="title_notifications">工具箱</string>
+    <string name="bottom">➕</string>
 </resources>
