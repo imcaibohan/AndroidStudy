@@ -24,7 +24,7 @@
         app:layout_constraintVertical_bias="0.758" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/floatingActionButton"
+        android:id="@+id/floating_action_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
@@ -36,11 +36,12 @@
         app:layout_constraintTop_toBottomOf="@+id/text_parts"
         tools:ignore="MissingConstraints" />
 
-    <ListView
+    <SearchView
+        android:id="@+id/search_view"
         android:layout_width="409dp"
         android:layout_height="534dp"
         tools:layout_editor_absoluteX="1dp"
-        tools:layout_editor_absoluteY="1dp"
+        tools:layout_editor_absoluteY="-20dp"
         tools:ignore="MissingConstraints" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

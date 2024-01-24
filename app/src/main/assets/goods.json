@@ -1,0 +1,21 @@
+[
+  {
+    "p-key": "tire",
+    "p-value": "外胎",
+    "p-value-simple": "wt",
+    "children": [
+      {
+        "brand": "伊诺华",
+        "specs": "28*700",
+        "price": 105.5,
+        "date": "2024-01-02"
+      },
+      {
+        "brand": "玛吉斯",
+        "specs": "2.1*29",
+        "price": 210,
+        "date": "2024-01-12"
+      }
+    ]
+  }
+]
