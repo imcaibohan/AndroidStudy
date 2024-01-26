@@ -4,6 +4,8 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,6 +18,7 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.R;
+import com.example.myapplication.utils.GaodeConstant;
 import com.example.myapplication.databinding.FragmentPartsBinding;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
@@ -28,6 +31,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class PartsFragment extends Fragment {
 
@@ -54,6 +63,22 @@ public class PartsFragment extends Fragment {
                         .setPositiveButton("确定", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
                                 // 在这里编写点击确定按钮后的逻辑
+                                Thread thread = new Thread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        Response weather = getWeather();
+                                        boolean isUploadSuccessful = weather.isSuccessful(); // 替换为实际的文件路径
+                                        Message message = Message.obtain(); // 创建消息对象
+                                        if (isUploadSuccessful) {
+                                            message.what = 1;
+                                            message.obj = weather.body(); // 设置消息的what字段为1，表示上传成功
+                                        } else {
+                                            message.what = 0; // 设置消息的what字段为0，表示上传失败
+                                        }
+                                        handler.sendMessage(message); // 通过Handler发送消息到主线程
+                                    }
+                                });
+                                thread.start(); // 启动线程
                             }
                         })
                         .setNegativeButton("取消", new DialogInterface.OnClickListener() {
@@ -101,8 +126,7 @@ public class PartsFragment extends Fragment {
     }
 
 
-    // 检查是否存在和库存情况的逻辑，这里需要你根据实际情况来实现这个方法
-    private JsonArray getGoodsArray(String query) { /* 实现检查的逻辑 */
+    private JsonArray getGoodsArray(String query) {
         try {
             JsonArray goodsList = readJsonFromAssets();
             for (JsonElement jsonElement : goodsList) {
@@ -118,11 +142,11 @@ public class PartsFragment extends Fragment {
         }
     };
 
-    private void showAlertDialog(JsonArray goodsArray, int page) {
+    private void showAlertDialog(final JsonArray goodsArray, final int page) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         builder.setTitle("总计 " + goodsArray.size() + "当前第 " + page);
         JsonObject goods = goodsArray.get(page - 1).getAsJsonObject();
-        builder.setMessage("品牌：" + goods.get("brand") + "\n" + "规格：" + goods.get("specs") + "\n" + "进货价：" + goods.get("price") + "\n" + "进货日期：" + goods.get("date"));
+        builder.setMessage("品牌：" + goods.get("brand") + "\n" + "规格：" + goods.get("specs") + "\n" + "进货价：￥" + goods.get("price") + "\n" + "进货日期：" + goods.get("date"));
         final int[] finalPage = {page};
         builder.setPositiveButton("使用", new DialogInterface.OnClickListener() {
             @Override
@@ -155,52 +179,12 @@ public class PartsFragment extends Fragment {
         builder.show();
     }
 
-    public static class Goods {
-        private String key;
-
-        private String value;
-
-        private Long stock;
-
-
-
-        public Long getStock() {
-            return stock;
-        }
-
-        public void setStock(Long stock) {
-            this.stock = stock;
-        }
-
-        public String getKey() {
-            return key;
-        }
-
-        public void setKey(String key) {
-            this.key = key;
-        }
-
-        public String getValue() {
-            return value;
-        }
-
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-        public Goods(JsonObject jsonObject) {
-            this.key = jsonObject.get("key").getAsString();
-            this.value = jsonObject.get("value").getAsString();
-            this.stock = jsonObject.get("stock").getAsLong();
-        }
-    }
-
     public JsonArray readJsonFromAssets() {
         Context context = requireActivity().getApplicationContext();
         JsonArray jsonArray = new JsonArray();
         BufferedReader bufferedReader = null;
         try {
-            InputStream is = context.getAssets().open("goods.json");
+            InputStream is = context.getAssets().open("goods.txt");
             Reader reader = new InputStreamReader(is);
             bufferedReader = new BufferedReader(reader);
             StringBuilder stringBuilder = new StringBuilder();
@@ -221,6 +205,46 @@ public class PartsFragment extends Fragment {
             }
         }
         return jsonArray;
+    }
+
+    private Handler handler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            if (msg.what == 1) {
+                Toast.makeText(getActivity(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+            } else if (msg.what == 0) {
+                Toast.makeText(getActivity(), "文件上传失败！", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
+    private Response getWeather() {
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .build();
+        Request request = new Request.Builder()
+                .url(String.format(GaodeConstant.WEATHER_API,GaodeConstant.AIR_FRIEND_WEB))
+                .build();
+        final Response[] result = {null};
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                e.printStackTrace();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    // 处理响应数据
+                    System.out.println(responseBody);
+                    result[0] = response;
+                } else {
+                    // 处理错误响应
+                }
+            }
+        });
+        return result[0]; // 示例中返回true表示文件上传成功，你可以根据实际情况进行修改和扩展逻辑。
     }
 
     @Override
