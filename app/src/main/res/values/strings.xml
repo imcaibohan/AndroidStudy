@@ -4,4 +4,6 @@
     <string name="title_parts">仓库</string>
     <string name="title_notifications">工具箱</string>
     <string name="bottom">➕</string>
+    <string name="parts_title_left">天气</string>
+    <string name="parts_title_middle">每日60秒早报</string>
 </resources>

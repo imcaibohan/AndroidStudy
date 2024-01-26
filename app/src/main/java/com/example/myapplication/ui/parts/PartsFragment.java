@@ -1,5 +1,6 @@
 package com.example.myapplication.ui.parts;
 
+import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -9,6 +10,7 @@ import android.os.Message;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -18,7 +20,7 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.R;
-import com.example.myapplication.utils.GaodeConstant;
+import com.example.myapplication.utils.ApiConstant;
 import com.example.myapplication.databinding.FragmentPartsBinding;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
@@ -31,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.HashMap;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -62,23 +65,7 @@ public class PartsFragment extends Fragment {
                         .setMessage("这是一个提示框")
                         .setPositiveButton("确定", new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
-                                // 在这里编写点击确定按钮后的逻辑
-                                Thread thread = new Thread(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Response weather = getWeather();
-                                        boolean isUploadSuccessful = weather.isSuccessful(); // 替换为实际的文件路径
-                                        Message message = Message.obtain(); // 创建消息对象
-                                        if (isUploadSuccessful) {
-                                            message.what = 1;
-                                            message.obj = weather.body(); // 设置消息的what字段为1，表示上传成功
-                                        } else {
-                                            message.what = 0; // 设置消息的what字段为0，表示上传失败
-                                        }
-                                        handler.sendMessage(message); // 通过Handler发送消息到主线程
-                                    }
-                                });
-                                thread.start(); // 启动线程
+
                             }
                         })
                         .setNegativeButton("取消", new DialogInterface.OnClickListener() {
@@ -120,6 +107,36 @@ public class PartsFragment extends Fragment {
             public boolean onQueryTextChange(String newText) {
                 // 当用户在搜索框中输入内容时触发
                 return false; // 表示没有处理这个事件
+            }
+        });
+
+        Button weatherButton = view.findViewById(R.id.weather_button);
+        weatherButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 在这里编写点击确定按钮后的逻辑
+                Thread thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        getWeather();
+                    }
+                });
+                thread.start(); // 启动线程
+            }
+        });
+
+        Button newsButton = view.findViewById(R.id.news_button);
+        newsButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 在这里编写点击确定按钮后的逻辑
+                Thread thread = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        getNews();
+                    }
+                });
+                thread.start(); // 启动线程
             }
         });
         return view;
@@ -207,29 +224,53 @@ public class PartsFragment extends Fragment {
         return jsonArray;
     }
 
-    private Handler handler = new Handler() {
+    //=====================================================================================================
+
+    @SuppressLint("HandlerLeak")
+    private final Handler weatherHandler = new Handler() {
         @Override
-        public void handleMessage(Message msg) {
+        public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
             if (msg.what == 1) {
-                Toast.makeText(getActivity(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+//                Toast.makeText(getActivity(), msg.obj.toString(), Toast.LENGTH_SHORT).show();
+                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+                builder.setTitle("今日天气");
+//                JsonObject goods = goodsArray.get(page - 1).getAsJsonObject();
+                JsonObject body = new Gson().fromJson(msg.obj.toString(), JsonObject.class);
+                JsonArray lives = body.get("lives").getAsJsonArray();
+                JsonObject weatherJson = lives.get(0).getAsJsonObject();
+                builder.setMessage("所在地 " + weatherJson.get("province") + "-" + weatherJson.get("city") + "\n"
+                    + "天气 " + weatherJson.get("weather") + "\n"
+                        + "温度 " + weatherJson.get("temperature") + "℃" +  "\n"
+                        + "风向 " + weatherJson.get("winddirection") + "\n"
+                        + "风力指数 " + weatherJson.get("windpower") + "\n"
+                        + "湿度 " + weatherJson.get("humidity") + "%" + "\n"
+                        + "更新时间 " + weatherJson.get("reporttime")
+                );
+//                builder.setNegativeButton("关闭", new DialogInterface.OnClickListener() {
+//                    @Override
+//                    public void onClick(DialogInterface dialog, int which) {
+//                    }
+//                });
+                builder.show();
             } else if (msg.what == 0) {
-                Toast.makeText(getActivity(), "文件上传失败！", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getActivity(), "请检查网络", Toast.LENGTH_SHORT).show();
             }
         }
     };
 
-    private Response getWeather() {
+    private void getWeather() {
         OkHttpClient client = new OkHttpClient().newBuilder()
                 .build();
         Request request = new Request.Builder()
-                .url(String.format(GaodeConstant.WEATHER_API,GaodeConstant.AIR_FRIEND_WEB))
+                .url(String.format(ApiConstant.WEATHER_API, ApiConstant.AIR_FRIEND_WEB))
                 .build();
         final Response[] result = {null};
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
+                // 处理错误响应
+                Toast.makeText(getActivity(), "请检查网络", Toast.LENGTH_SHORT).show();
             }
 
             @Override
@@ -238,13 +279,117 @@ public class PartsFragment extends Fragment {
                     String responseBody = response.body().string();
                     // 处理响应数据
                     System.out.println(responseBody);
-                    result[0] = response;
+                    Message message = Message.obtain(); // 创建消息对象
+                    if (response.isSuccessful()) {
+                        message.what = 1;
+                        message.obj = responseBody; // 设置消息的what字段为1，表示上传成功
+                    } else {
+                        message.what = 0; // 设置消息的what字段为0，表示上传失败
+                    }
+                    weatherHandler.sendMessage(message); // 通过Handler发送消息到主线程
                 } else {
                     // 处理错误响应
                 }
             }
         });
-        return result[0]; // 示例中返回true表示文件上传成功，你可以根据实际情况进行修改和扩展逻辑。
+    }
+
+    //=====================================================================================================
+
+    @SuppressLint("HandlerLeak")
+    private final Handler newsHandler = new Handler() {
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            super.handleMessage(msg);
+            if (msg.what == 1) {
+                JsonObject body = new Gson().fromJson(msg.obj.toString(), JsonObject.class);
+                JsonObject data = body.get("data").getAsJsonObject();
+                showAlertDialogNews(data,-1);
+            } else if (msg.what == 0) {
+                Toast.makeText(getActivity(), "请检查网络", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
+    public void showAlertDialogNews(JsonObject data, int page){
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setTitle(data.get("date").getAsString() + " Daily News");
+
+        JsonArray newsArrays = data.get("news").getAsJsonArray();
+        String sentence = data.get("weiyu").getAsString();
+        if (page == -1){
+            builder.setMessage(sentence);
+        }else {
+            builder.setMessage(newsArrays.get(page).getAsString());
+        }
+
+        final int[] finalPage = {page};
+//        builder.setNeutralButton("关闭", new DialogInterface.OnClickListener() {
+//            @Override
+//            public void onClick(DialogInterface dialog, int which) {
+//            }
+//        });
+        builder.setPositiveButton("下一个", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                finalPage[0]++;
+                if (finalPage[0] > newsArrays.size() - 1){
+                    //如果翻到界外去了 就回到第一页
+                    showAlertDialogNews(data, 0);
+                }else {
+                    showAlertDialogNews(data, finalPage[0]);
+                }
+            }
+        });
+
+        builder.setNegativeButton("上一个", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                finalPage[0]--;
+                if (finalPage[0] < 0){
+                    //如果翻到界外去了 就回到第一页
+                    showAlertDialogNews(data, newsArrays.size() - 1);
+                }else {
+                    showAlertDialogNews(data, finalPage[0]);
+                }
+            }
+        });
+
+        builder.show();
+    }
+
+    private void getNews() {
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .build();
+        Request request = new Request.Builder()
+                .url(String.format(ApiConstant.NEWS_API, ApiConstant.ALAPI_KEY))
+                .build();
+        final Response[] result = {null};
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                // 处理错误响应
+                Toast.makeText(getActivity(), "请检查网络", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    // 处理响应数据
+                    Message message = Message.obtain(); // 创建消息对象
+                    if (response.isSuccessful()) {
+                        message.what = 1;
+                        message.obj = responseBody; // 设置消息的what字段为1，表示上传成功
+                    } else {
+                        message.what = 0; // 设置消息的what字段为0，表示上传失败
+                    }
+                    newsHandler.sendMessage(message); // 通过Handler发送消息到主线程
+                } else {
+                    // 处理错误响应
+                }
+            }
+        });
     }
 
     @Override
