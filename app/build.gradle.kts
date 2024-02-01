@@ -48,6 +48,7 @@ dependencies {
     implementation("androidx.gridlayout:gridlayout:1.0.0")
     implementation("com.google.code.gson:gson:2.8.9")
     implementation ("redis.clients:jedis:3.7.0")
+    implementation ("com.aliyun.dpa:oss-android-sdk:2.9.13")
 //    implementation("com.android.volley:volley:1.2.1")
 //    implementation("com.mashape.unirest:unirest-java:1.4.9")
     // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp

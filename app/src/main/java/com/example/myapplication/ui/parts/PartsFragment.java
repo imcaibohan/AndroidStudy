@@ -2,7 +2,6 @@ package com.example.myapplication.ui.parts;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,24 +15,23 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.myapplication.R;
+import com.example.myapplication.ui.goods.GoodsDialogFragment;
 import com.example.myapplication.utils.ApiConstant;
 import com.example.myapplication.databinding.FragmentPartsBinding;
+import com.example.myapplication.utils.FileUtils;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.HashMap;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -60,21 +58,9 @@ public class PartsFragment extends Fragment {
         floatingActionButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-                builder.setTitle("提示")
-                        .setMessage("这是一个提示框")
-                        .setPositiveButton("确定", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-
-                            }
-                        })
-                        .setNegativeButton("取消", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                // 在这里编写点击取消按钮后的逻辑
-                            }
-                        });
-                AlertDialog dialog = builder.create();
-                dialog.show();
+//                showAlertDialogGoodsAdd();
+                DialogFragment newFragment = new GoodsDialogFragment();
+                newFragment.show(requireActivity().getSupportFragmentManager(), "dialog");
             }
         });
 
@@ -84,16 +70,21 @@ public class PartsFragment extends Fragment {
             public boolean onQueryTextSubmit(String query) {
                 // 当用户点击搜索或按下回车键时触发
                 if (query != null && query.length() > 0) {
-                    JsonArray goodsArray = getGoodsArray(query);
-                    if (goodsArray != null) {
-                        if (goodsArray.size() > 0){
-                            showAlertDialog(goodsArray,1); // 显示弹窗，这里需要实现showAlertDialog方法来创建和显示弹窗
-
+                    JsonArray goodsList = FileUtils.readJsonFromAssets(requireActivity());
+                    JsonArray goodsChildrenArray = null;
+                    for (JsonElement jsonElement : goodsList) {
+                        if (jsonElement.getAsJsonObject().get("p-value").getAsString().equals(query)
+                                || jsonElement.getAsJsonObject().get("p-value-simple").getAsString().equals(query)
+                        ) {
+                            goodsChildrenArray = jsonElement.getAsJsonObject().get("children").getAsJsonArray();
+                        }
+                    }
+                    if (goodsChildrenArray != null) {
+                        if (goodsChildrenArray.size() > 0){
+                            showAlertDialogGoodsDetail(getActivity(),goodsList,goodsChildrenArray,1); // 显示弹窗，这里需要实现showAlertDialog方法来创建和显示弹窗
                         }else {
                             Toast.makeText(getActivity(), query + "未入库", Toast.LENGTH_SHORT).show();
-
                         }
-
                     }else {
                         Toast.makeText(getActivity(), query + "未入库", Toast.LENGTH_SHORT).show();
                     }
@@ -142,37 +133,25 @@ public class PartsFragment extends Fragment {
         return view;
     }
 
+    //库存==============================================================
 
-    private JsonArray getGoodsArray(String query) {
-        try {
-            JsonArray goodsList = readJsonFromAssets();
-            for (JsonElement jsonElement : goodsList) {
-                if (jsonElement.getAsJsonObject().get("p-value").getAsString().equals(query)
-                        || jsonElement.getAsJsonObject().get("p-value-simple").getAsString().equals(query)
-                ) {
-                    return jsonElement.getAsJsonObject().get("children").getAsJsonArray();
-                }
-            }
-            return null;
-        } catch (Exception ignore) {
-            return null;
-        }
-    };
 
-    private void showAlertDialog(final JsonArray goodsArray, final int page) {
+    private void showAlertDialogGoodsDetail(FragmentActivity activity, JsonArray goodsList, final JsonArray goodsChildrenArray, final int page) {
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setTitle("总计 " + goodsArray.size() + "当前第 " + page);
-        JsonObject goods = goodsArray.get(page - 1).getAsJsonObject();
+        builder.setTitle("总计 " + goodsChildrenArray.size() + "当前第 " + page);
+        JsonObject goods = goodsChildrenArray.get(page - 1).getAsJsonObject();
         builder.setMessage("品牌：" + goods.get("brand") + "\n" + "规格：" + goods.get("specs") + "\n" + "进货价：￥" + goods.get("price") + "\n" + "进货日期：" + goods.get("date"));
         final int[] finalPage = {page};
         builder.setPositiveButton("使用", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 // 实现使用逻辑，减少库存
-                goodsArray.remove(page - 1);
+                goodsChildrenArray.remove(page - 1);
+                // 重写goods.xml文件
+                FileUtils.writeJsonToInternalStorage(activity,goodsList);
                 //如果还有则才弹窗
-                if (goodsArray.size() > 0){
-                    showAlertDialog(goodsArray, 1);
+                if (goodsChildrenArray.size() > 0){
+                    showAlertDialogGoodsDetail(getActivity(), goodsList, goodsChildrenArray, 1);
                 }
             }
         });
@@ -180,11 +159,11 @@ public class PartsFragment extends Fragment {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 finalPage[0]++;
-                if (finalPage[0] > goodsArray.size()){
+                if (finalPage[0] > goodsChildrenArray.size()){
                     //如果翻到界外去了 就回到第一页
-                    showAlertDialog(goodsArray, 1);
+                    showAlertDialogGoodsDetail(getActivity(), goodsList, goodsChildrenArray, 1);
                 }else {
-                    showAlertDialog(goodsArray, finalPage[0]);
+                    showAlertDialogGoodsDetail(getActivity(), goodsList, goodsChildrenArray, finalPage[0]);
                 }
             }
         });
@@ -196,35 +175,7 @@ public class PartsFragment extends Fragment {
         builder.show();
     }
 
-    public JsonArray readJsonFromAssets() {
-        Context context = requireActivity().getApplicationContext();
-        JsonArray jsonArray = new JsonArray();
-        BufferedReader bufferedReader = null;
-        try {
-            InputStream is = context.getAssets().open("goods.txt");
-            Reader reader = new InputStreamReader(is);
-            bufferedReader = new BufferedReader(reader);
-            StringBuilder stringBuilder = new StringBuilder();
-            String line;
-            while ((line = bufferedReader.readLine()) != null) {
-                stringBuilder.append(line);
-            }
-            jsonArray = new Gson().fromJson(stringBuilder.toString(), JsonArray.class);
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            try {
-                if (bufferedReader != null) {
-                    bufferedReader.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        return jsonArray;
-    }
-
-    //=====================================================================================================
+    //天气=========================================================================================
 
     @SuppressLint("HandlerLeak")
     private final Handler weatherHandler = new Handler() {
@@ -294,7 +245,7 @@ public class PartsFragment extends Fragment {
         });
     }
 
-    //=====================================================================================================
+    //新闻=========================================================================================
 
     @SuppressLint("HandlerLeak")
     private final Handler newsHandler = new Handler() {
